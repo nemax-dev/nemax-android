@@ -1,6 +1,6 @@
 # neMAX — приватная версия мессенджера "Макс"
 
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT) [![Telegram](https://img.shields.io/badge/Telegram-2CA5E0?style=for-the-badge&logo=telegram&logoColor=white)](https://t.me/nemax_mod)
 
 **neMAX — это модифицированная версия официального мессенджера "Макс", из которой полностью убрана телеметрия, аналитика и идентификаторы**
 
