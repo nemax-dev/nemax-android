@@ -1,0 +1,226 @@
+.class public final Lo7;
+.super Ljava/lang/Object;
+.source "SourceFile"
+
+# interfaces
+.implements Lcz0;
+
+
+# instance fields
+.field public final a:Ljava/util/concurrent/CopyOnWriteArraySet;
+
+
+# direct methods
+.method public constructor <init>()V
+    .locals 1
+
+    invoke-direct {p0}, Ljava/lang/Object;-><init>()V
+
+    new-instance v0, Ljava/util/concurrent/CopyOnWriteArraySet;
+
+    invoke-direct {v0}, Ljava/util/concurrent/CopyOnWriteArraySet;-><init>()V
+
+    iput-object v0, p0, Lo7;->a:Ljava/util/concurrent/CopyOnWriteArraySet;
+
+    return-void
+.end method
+
+
+# virtual methods
+.method public final onActiveParticipantUpdated(Lbz0;)V
+    .locals 1
+
+    iget-object p0, p0, Lo7;->a:Ljava/util/concurrent/CopyOnWriteArraySet;
+
+    invoke-virtual {p0}, Ljava/util/concurrent/CopyOnWriteArraySet;->iterator()Ljava/util/Iterator;
+
+    move-result-object p0
+
+    :goto_0
+    invoke-interface {p0}, Ljava/util/Iterator;->hasNext()Z
+
+    move-result v0
+
+    if-eqz v0, :cond_0
+
+    invoke-interface {p0}, Ljava/util/Iterator;->next()Ljava/lang/Object;
+
+    move-result-object v0
+
+    check-cast v0, Lcz0;
+
+    invoke-interface {v0, p1}, Lcz0;->onActiveParticipantUpdated(Lbz0;)V
+
+    goto :goto_0
+
+    :cond_0
+    return-void
+.end method
+
+.method public final onActiveParticipantsAdded(Lxy0;)V
+    .locals 1
+
+    iget-object v0, p1, Lxy0;->a:Ljava/util/Collection;
+
+    invoke-interface {v0}, Ljava/util/Collection;->isEmpty()Z
+
+    move-result v0
+
+    if-eqz v0, :cond_0
+
+    goto :goto_1
+
+    :cond_0
+    iget-object p0, p0, Lo7;->a:Ljava/util/concurrent/CopyOnWriteArraySet;
+
+    invoke-virtual {p0}, Ljava/util/concurrent/CopyOnWriteArraySet;->iterator()Ljava/util/Iterator;
+
+    move-result-object p0
+
+    :goto_0
+    invoke-interface {p0}, Ljava/util/Iterator;->hasNext()Z
+
+    move-result v0
+
+    if-eqz v0, :cond_1
+
+    invoke-interface {p0}, Ljava/util/Iterator;->next()Ljava/lang/Object;
+
+    move-result-object v0
+
+    check-cast v0, Lcz0;
+
+    invoke-interface {v0, p1}, Lcz0;->onActiveParticipantsAdded(Lxy0;)V
+
+    goto :goto_0
+
+    :cond_1
+    :goto_1
+    return-void
+.end method
+
+.method public final onActiveParticipantsChanged(Lyy0;)V
+    .locals 1
+
+    iget-object v0, p1, Lyy0;->a:Ljava/util/List;
+
+    invoke-interface {v0}, Ljava/util/Collection;->isEmpty()Z
+
+    move-result v0
+
+    if-eqz v0, :cond_0
+
+    goto :goto_1
+
+    :cond_0
+    iget-object p0, p0, Lo7;->a:Ljava/util/concurrent/CopyOnWriteArraySet;
+
+    invoke-virtual {p0}, Ljava/util/concurrent/CopyOnWriteArraySet;->iterator()Ljava/util/Iterator;
+
+    move-result-object p0
+
+    :goto_0
+    invoke-interface {p0}, Ljava/util/Iterator;->hasNext()Z
+
+    move-result v0
+
+    if-eqz v0, :cond_1
+
+    invoke-interface {p0}, Ljava/util/Iterator;->next()Ljava/lang/Object;
+
+    move-result-object v0
+
+    check-cast v0, Lcz0;
+
+    invoke-interface {v0, p1}, Lcz0;->onActiveParticipantsChanged(Lyy0;)V
+
+    goto :goto_0
+
+    :cond_1
+    :goto_1
+    return-void
+.end method
+
+.method public final onActiveParticipantsDeAnonimized(Lzy0;)V
+    .locals 1
+
+    iget-object v0, p1, Lzy0;->a:Ljava/util/Collection;
+
+    invoke-interface {v0}, Ljava/util/Collection;->isEmpty()Z
+
+    move-result v0
+
+    if-eqz v0, :cond_0
+
+    goto :goto_1
+
+    :cond_0
+    iget-object p0, p0, Lo7;->a:Ljava/util/concurrent/CopyOnWriteArraySet;
+
+    invoke-virtual {p0}, Ljava/util/concurrent/CopyOnWriteArraySet;->iterator()Ljava/util/Iterator;
+
+    move-result-object p0
+
+    :goto_0
+    invoke-interface {p0}, Ljava/util/Iterator;->hasNext()Z
+
+    move-result v0
+
+    if-eqz v0, :cond_1
+
+    invoke-interface {p0}, Ljava/util/Iterator;->next()Ljava/lang/Object;
+
+    move-result-object v0
+
+    check-cast v0, Lcz0;
+
+    invoke-interface {v0, p1}, Lcz0;->onActiveParticipantsDeAnonimized(Lzy0;)V
+
+    goto :goto_0
+
+    :cond_1
+    :goto_1
+    return-void
+.end method
+
+.method public final onActiveParticipantsRemoved(Laz0;)V
+    .locals 1
+
+    iget-object v0, p1, Laz0;->a:Ljava/util/Collection;
+
+    invoke-interface {v0}, Ljava/util/Collection;->isEmpty()Z
+
+    move-result v0
+
+    if-eqz v0, :cond_0
+
+    goto :goto_1
+
+    :cond_0
+    iget-object p0, p0, Lo7;->a:Ljava/util/concurrent/CopyOnWriteArraySet;
+
+    invoke-virtual {p0}, Ljava/util/concurrent/CopyOnWriteArraySet;->iterator()Ljava/util/Iterator;
+
+    move-result-object p0
+
+    :goto_0
+    invoke-interface {p0}, Ljava/util/Iterator;->hasNext()Z
+
+    move-result v0
+
+    if-eqz v0, :cond_1
+
+    invoke-interface {p0}, Ljava/util/Iterator;->next()Ljava/lang/Object;
+
+    move-result-object v0
+
+    check-cast v0, Lcz0;
+
+    invoke-interface {v0, p1}, Lcz0;->onActiveParticipantsRemoved(Laz0;)V
+
+    goto :goto_0
+
+    :cond_1
+    :goto_1
+    return-void
+.end method

@@ -1,0 +1,125 @@
+.class public final Lr59;
+.super Lsse;
+.source "SourceFile"
+
+# interfaces
+.implements Led6;
+
+
+# instance fields
+.field public X:I
+
+.field public synthetic Y:Ld59;
+
+.field public synthetic Z:Lg59;
+
+.field public synthetic r0:Z
+
+.field public final synthetic s0:Ld69;
+
+
+# direct methods
+.method public constructor <init>(Ld69;Lkotlin/coroutines/Continuation;)V
+    .locals 0
+
+    iput-object p1, p0, Lr59;->s0:Ld69;
+
+    const/4 p1, 0x4
+
+    invoke-direct {p0, p1, p2}, Lsse;-><init>(ILkotlin/coroutines/Continuation;)V
+
+    return-void
+.end method
+
+
+# virtual methods
+.method public final i(Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+    .locals 1
+
+    check-cast p1, Ld59;
+
+    check-cast p2, Lg59;
+
+    check-cast p3, Ljava/lang/Boolean;
+
+    invoke-virtual {p3}, Ljava/lang/Boolean;->booleanValue()Z
+
+    move-result p3
+
+    check-cast p4, Lkotlin/coroutines/Continuation;
+
+    new-instance v0, Lr59;
+
+    iget-object p0, p0, Lr59;->s0:Ld69;
+
+    invoke-direct {v0, p0, p4}, Lr59;-><init>(Ld69;Lkotlin/coroutines/Continuation;)V
+
+    iput-object p1, v0, Lr59;->Y:Ld59;
+
+    iput-object p2, v0, Lr59;->Z:Lg59;
+
+    iput-boolean p3, v0, Lr59;->r0:Z
+
+    sget-object p0, Lxmf;->a:Lxmf;
+
+    invoke-virtual {v0, p0}, Lr59;->o(Ljava/lang/Object;)Ljava/lang/Object;
+
+    move-result-object p0
+
+    return-object p0
+.end method
+
+.method public final o(Ljava/lang/Object;)Ljava/lang/Object;
+    .locals 4
+
+    iget v0, p0, Lr59;->X:I
+
+    const/4 v1, 0x1
+
+    if-eqz v0, :cond_1
+
+    if-ne v0, v1, :cond_0
+
+    invoke-static {p1}, Lib6;->K(Ljava/lang/Object;)V
+
+    return-object p1
+
+    :cond_0
+    new-instance p0, Ljava/lang/IllegalStateException;
+
+    const-string p1, "call to \'resume\' before \'invoke\' with coroutine"
+
+    invoke-direct {p0, p1}, Ljava/lang/IllegalStateException;-><init>(Ljava/lang/String;)V
+
+    throw p0
+
+    :cond_1
+    invoke-static {p1}, Lib6;->K(Ljava/lang/Object;)V
+
+    iget-object p1, p0, Lr59;->Y:Ld59;
+
+    iget-object v0, p0, Lr59;->Z:Lg59;
+
+    iget-boolean v2, p0, Lr59;->r0:Z
+
+    const/4 v3, 0x0
+
+    iput-object v3, p0, Lr59;->Y:Ld59;
+
+    iput v1, p0, Lr59;->X:I
+
+    iget-object v1, p0, Lr59;->s0:Ld69;
+
+    invoke-static {v1, p1, v0, v2, p0}, Ld69;->q(Ld69;Ld59;Lg59;ZLqx3;)Ljava/lang/Object;
+
+    move-result-object p0
+
+    sget-object p1, Lg14;->a:Lg14;
+
+    if-ne p0, p1, :cond_2
+
+    return-object p1
+
+    :cond_2
+    return-object p0
+.end method

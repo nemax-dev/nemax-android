@@ -1,0 +1,190 @@
+.class public final Lp21;
+.super Lsse;
+.source "SourceFile"
+
+# interfaces
+.implements Lad6;
+
+
+# instance fields
+.field public synthetic X:Ljava/lang/Object;
+
+.field public final synthetic Y:Lone/me/calls/ui/ui/call/panels/CallBottomPanelWidget;
+
+
+# direct methods
+.method public constructor <init>(Lkotlin/coroutines/Continuation;Lone/me/calls/ui/ui/call/panels/CallBottomPanelWidget;)V
+    .locals 0
+
+    iput-object p2, p0, Lp21;->Y:Lone/me/calls/ui/ui/call/panels/CallBottomPanelWidget;
+
+    const/4 p2, 0x2
+
+    invoke-direct {p0, p2, p1}, Lsse;-><init>(ILkotlin/coroutines/Continuation;)V
+
+    return-void
+.end method
+
+
+# virtual methods
+.method public final invoke(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;
+    .locals 0
+
+    check-cast p2, Lkotlin/coroutines/Continuation;
+
+    invoke-virtual {p0, p1, p2}, Lp21;->m(Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Lkotlin/coroutines/Continuation;
+
+    move-result-object p0
+
+    check-cast p0, Lp21;
+
+    sget-object p1, Lxmf;->a:Lxmf;
+
+    invoke-virtual {p0, p1}, Lp21;->o(Ljava/lang/Object;)Ljava/lang/Object;
+
+    return-object p1
+.end method
+
+.method public final m(Ljava/lang/Object;Lkotlin/coroutines/Continuation;)Lkotlin/coroutines/Continuation;
+    .locals 1
+
+    new-instance v0, Lp21;
+
+    iget-object p0, p0, Lp21;->Y:Lone/me/calls/ui/ui/call/panels/CallBottomPanelWidget;
+
+    invoke-direct {v0, p2, p0}, Lp21;-><init>(Lkotlin/coroutines/Continuation;Lone/me/calls/ui/ui/call/panels/CallBottomPanelWidget;)V
+
+    iput-object p1, v0, Lp21;->X:Ljava/lang/Object;
+
+    return-object v0
+.end method
+
+.method public final o(Ljava/lang/Object;)Ljava/lang/Object;
+    .locals 4
+
+    invoke-static {p1}, Lib6;->K(Ljava/lang/Object;)V
+
+    iget-object p1, p0, Lp21;->X:Ljava/lang/Object;
+
+    check-cast p1, Lbr0;
+
+    sget-object v0, Lone/me/calls/ui/ui/call/panels/CallBottomPanelWidget;->r0:[Lqj7;
+
+    iget-object p0, p0, Lp21;->Y:Lone/me/calls/ui/ui/call/panels/CallBottomPanelWidget;
+
+    invoke-virtual {p0}, Lone/me/calls/ui/ui/call/panels/CallBottomPanelWidget;->y0()Lv11;
+
+    move-result-object v0
+
+    invoke-virtual {p0}, Lone/me/calls/ui/ui/call/panels/CallBottomPanelWidget;->y0()Lv11;
+
+    move-result-object v1
+
+    const/4 v2, 0x0
+
+    if-eqz v1, :cond_0
+
+    goto :goto_0
+
+    :cond_0
+    move-object v1, v2
+
+    :goto_0
+    if-eqz v1, :cond_4
+
+    invoke-virtual {v1}, Landroid/view/View;->getVisibility()I
+
+    move-result v1
+
+    if-nez v1, :cond_4
+
+    iget-object v1, p1, Lbr0;->b:Lva8;
+
+    iget-object v3, p1, Lbr0;->a:Lva8;
+
+    invoke-virtual {v0, v1}, Lv11;->setVideoEnabled(Lva8;)V
+
+    invoke-virtual {v0, v3}, Lv11;->setMicrophoneEnabled(Lva8;)V
+
+    iget-object v1, p1, Lbr0;->c:Lva8;
+
+    invoke-virtual {v0, v1}, Lv11;->setRaiseHand(Lva8;)V
+
+    iget-object v1, p1, Lbr0;->d:Lva8;
+
+    invoke-virtual {v0, v1}, Lv11;->setOpenChat(Lva8;)V
+
+    invoke-virtual {p0}, Lone/me/calls/ui/ui/call/panels/CallBottomPanelWidget;->y0()Lv11;
+
+    move-result-object v0
+
+    iget-object p1, p1, Lbr0;->e:Lj51;
+
+    invoke-virtual {v0, p1}, Lv11;->setAudioInfo(Lj51;)V
+
+    invoke-virtual {p0}, Lone/me/calls/ui/ui/call/panels/CallBottomPanelWidget;->y0()Lv11;
+
+    move-result-object p1
+
+    sget-object v0, Lva8;->b:Lva8;
+
+    const/4 v1, 0x1
+
+    if-ne v3, v0, :cond_1
+
+    move v0, v1
+
+    goto :goto_1
+
+    :cond_1
+    const/4 v0, 0x0
+
+    :goto_1
+    iget-object v3, p0, Lone/me/calls/ui/ui/call/panels/CallBottomPanelWidget;->c:Lvl7;
+
+    invoke-interface {v3}, Lvl7;->getValue()Ljava/lang/Object;
+
+    move-result-object v3
+
+    check-cast v3, Lpm1;
+
+    invoke-virtual {v3}, Lpm1;->v()Z
+
+    move-result v3
+
+    if-nez v3, :cond_2
+
+    goto :goto_2
+
+    :cond_2
+    if-eqz v0, :cond_3
+
+    invoke-virtual {p0}, Lone/me/sdk/arch/Widget;->getViewLifecycleScope()Lfo7;
+
+    move-result-object v0
+
+    new-instance v3, Lm21;
+
+    invoke-direct {v3, p0, p1, v2}, Lm21;-><init>(Lone/me/calls/ui/ui/call/panels/CallBottomPanelWidget;Lv11;Lkotlin/coroutines/Continuation;)V
+
+    const/4 p1, 0x3
+
+    invoke-static {v0, v2, v2, v3, p1}, Lvzg;->s(Lf14;Lx04;Li14;Lad6;I)Lwae;
+
+    move-result-object v2
+
+    :cond_3
+    iget-object p1, p0, Lone/me/calls/ui/ui/call/panels/CallBottomPanelWidget;->X:Lqod;
+
+    sget-object v0, Lone/me/calls/ui/ui/call/panels/CallBottomPanelWidget;->r0:[Lqj7;
+
+    aget-object v0, v0, v1
+
+    invoke-virtual {p1, p0, v0, v2}, Lqod;->h0(Ljava/lang/Object;Lqj7;Ljava/lang/Object;)V
+
+    :cond_4
+    :goto_2
+    sget-object p0, Lxmf;->a:Lxmf;
+
+    return-object p0
+.end method
