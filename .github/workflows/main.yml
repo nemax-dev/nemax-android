@@ -190,6 +190,7 @@ jobs:
           echo "New version will be: $NEW_VERSION"
 
       - name: Create Release
+        id: create_release
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ steps.version.outputs.new_version }}
@@ -240,6 +241,27 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Send Telegram Notification on Success
+        if: success()
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          RELEASE_VERSION: v${{ steps.version.outputs.new_version }}
+          RELEASE_URL: ${{ steps.create_release.outputs.html_url }}
+        run: |
+          MESSAGE_TEXT="✅ <b>Автоматический релиз neMAX</b>%0A%0A<b>Версия:</b> ${RELEASE_VERSION}%0A%0AЭто упрощённое автоматическое техническое обновление в связи с выходом новой версии оригинального приложения. Полноценный релиз с полным списком изменений ожидается позднее.%0A%0A<a href=\"${RELEASE_URL}\">Скачать с GitHub</a>"
+          
+          DISCLAIMER_TEXT="<pre>neMAX — неофициальный модифицированный клиент мессенджера \"Макс\"%0A%0AАвтор проекта не имеет никакого отношения к компании Communication Platform LLC, которая является владельцем и разработчиком оригинального приложения%0A%0AneMAX создан исключительно для повышения приватности пользователей Он не является продуктом, поддерживаемым или аффилированным с Communication Platform LLC или VK%0A%0AВсе права на оригинальное приложение принадлежат Communication Platform LLC. Модификация распространяется в исследовательских и образовательных целях, а также для личного некоммерческого использования%0A%0AИспользуя neMAX, вы понимаете, что это неофициальная сборка, и устанавливаете её на свой страх и риск Автор не несёт ответственности за любые последствия её применения</pre>"
+          
+          FINAL_MESSAGE="${MESSAGE_TEXT}%0A%0A${DISCLAIMER_TEXT}"
+
+          echo "Sending notification to Telegram..."
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d chat_id="${TELEGRAM_CHAT_ID}" \
+            -d text="${FINAL_MESSAGE}" \
+            -d parse_mode="HTML" \
+            -d disable_web_page_preview="true"
 
       - name: Cleanup
         if: always()
