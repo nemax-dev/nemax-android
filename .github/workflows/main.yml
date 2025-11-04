@@ -1,0 +1,250 @@
+name: APK Modifier
+
+on:
+  workflow_dispatch:
+    inputs:
+      apk_url:
+        description: 'APK'
+        required: true
+        type: string
+      version:
+        description: 'Версия'
+        required: true
+        type: string
+
+jobs:
+  modify-and-release:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: '17'
+
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y wget unzip
+
+      - name: Download and setup APKTool
+        run: |
+          wget https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool
+          wget https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar
+          chmod +x apktool
+          sudo mv apktool /usr/local/bin/
+          sudo mv apktool_2.9.3.jar /usr/local/bin/apktool.jar
+
+      - name: Download APK
+        run: |
+          echo "Downloading APK from: ${{ github.event.inputs.apk_url }}"
+          curl -L -o original.apk "${{ github.event.inputs.apk_url }}"
+          
+          # Проверяем, что файл скачался
+          if [ ! -f original.apk ] || [ ! -s original.apk ]; then
+            echo "Error: APK file was not downloaded or is empty"
+            exit 1
+          fi
+          
+          echo "APK downloaded successfully: $(ls -lh original.apk)"
+
+      - name: Decompile APK
+        run: |
+          apktool d original.apk -o decompiled -f
+
+      - name: Modify URLs in smali files
+        run: |
+          echo "Replacing tracker URLs in all smali files..."
+          
+          # Замена tracker-api.vk-analytics.ru на localhost
+          find decompiled -type f -name "*.smali" -exec sed -i 's|tracker-api\.vk-analytics\.ru|localhost|g' {} +
+          
+          # Замена sdk-api.apptracer.ru на localhost
+          find decompiled -type f -name "*.smali" -exec sed -i 's|sdk-api\.apptracer\.ru|localhost|g' {} +
+          
+          echo "URLs replaced successfully"
+
+      - name: Patch MyTracker.smali
+        run: |
+          echo "Patching MyTracker.smali..."
+          
+          # Находим файл MyTracker.smali
+          MYTRACKER_FILE=$(find decompiled -type f -name "MyTracker.smali" | head -1)
+          
+          if [ -z "$MYTRACKER_FILE" ]; then
+            echo "Warning: MyTracker.smali not found, skipping patch"
+          else
+            echo "Found MyTracker.smali at: $MYTRACKER_FILE"
+            
+            # Создаем Python скрипт для замены метода
+            cat > patch_mytracker.py << 'EOF'
+          import sys
+          import re
+          
+          file_path = sys.argv[1]
+          
+          with open(file_path, 'r', encoding='utf-8') as f:
+              content = f.read()
+          
+          # Паттерн для поиска метода initTracker
+          pattern = r'\.method public static initTracker\(Ljava/lang/String;Landroid/app/Application;\)V.*?\.end method'
+          
+          # Новая реализация метода
+          replacement = '''.method public static initTracker(Ljava/lang/String;Landroid/app/Application;)V
+              .locals 0
+              return-void
+          .end method'''
+          
+          # Заменяем метод
+          new_content = re.sub(pattern, replacement, content, flags=re.DOTALL)
+          
+          with open(file_path, 'w', encoding='utf-8') as f:
+              f.write(new_content)
+          
+          print("MyTracker.smali patched successfully")
+          EOF
+            
+            python3 patch_mytracker.py "$MYTRACKER_FILE"
+          fi
+
+      - name: Clean AndroidManifest.xml
+        run: |
+          echo "Cleaning AndroidManifest.xml..."
+          
+          MANIFEST_FILE="decompiled/AndroidManifest.xml"
+          
+          if [ ! -f "$MANIFEST_FILE" ]; then
+            echo "Error: AndroidManifest.xml not found"
+            exit 1
+          fi
+          
+          # Создаем Python скрипт для очистки манифеста
+          cat > clean_manifest.py << 'EOF'
+          import re
+          
+          with open('decompiled/AndroidManifest.xml', 'r', encoding='utf-8') as f:
+              content = f.read()
+          
+          # Удаляем permissions
+          permissions_to_remove = [
+              'android.permission.REQUEST_INSTALL_PACKAGES',
+              'android.permission.ACCESS_WIFI_STATE',
+              'android.permission.ACCESS_NETWORK_STATE',
+              'android.permission.ACCESS_FINE_LOCATION',
+              'android.permission.RECEIVE_BOOT_COMPLETED',
+              'android.permission.ACCESS_COARSE_LOCATION',
+              'android.permission.CHANGE_NETWORK_STATE'
+          ]
+          
+          for perm in permissions_to_remove:
+              pattern = rf'<uses-permission[^>]*android:name="{re.escape(perm)}"[^/]*/>\s*'
+              content = re.sub(pattern, '', content)
+          
+          # Удаляем meta-data с ru.ok.tracer
+          meta_data_pattern = r'<meta-data\s+android:name="ru\.ok\.tracer[^"]*"[^>]*android:value="[^"]*"\s*/>\s*'
+          content = re.sub(meta_data_pattern, '', content, flags=re.MULTILINE)
+          
+          with open('decompiled/AndroidManifest.xml', 'w', encoding='utf-8') as f:
+              f.write(content)
+          
+          print("AndroidManifest.xml cleaned successfully")
+          EOF
+          
+          python3 clean_manifest.py
+
+      - name: Rebuild APK
+        run: |
+          apktool b decompiled -o modified.apk
+
+      - name: Sign APK
+        run: |
+          # Создание keystore из секрета
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
+          
+          # Выравнивание APK
+          $ANDROID_HOME/build-tools/34.0.0/zipalign -v -p 4 modified.apk aligned.apk
+          
+          # Подпись APK
+          $ANDROID_HOME/build-tools/34.0.0/apksigner sign \
+            --ks keystore.jks \
+            --ks-key-alias "${{ secrets.KEY_ALIAS }}" \
+            --ks-pass pass:"${{ secrets.KEYSTORE_PASSWORD }}" \
+            --key-pass pass:"${{ secrets.KEY_PASSWORD }}" \
+            --out signed.apk \
+            aligned.apk
+          
+          # Проверка подписи
+          $ANDROID_HOME/build-tools/34.0.0/apksigner verify signed.apk
+          
+          echo "APK signed successfully"
+
+      - name: Calculate version
+        id: version
+        run: |
+          INPUT_VERSION="${{ github.event.inputs.version }}"
+          NEW_VERSION="${INPUT_VERSION}+auto"
+          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
+          echo "New version will be: $NEW_VERSION"
+
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ steps.version.outputs.new_version }}
+          name: Release v${{ steps.version.outputs.new_version }}
+          body: |
+            🤖 Автоматически модифицированная версия APK
+            
+            **Базовая версия:** ${{ github.event.inputs.version }}
+            **Модифицированная версия:** ${{ steps.version.outputs.new_version }}
+            
+            ## Изменения:
+            
+            ### URL замены:
+            - ✅ `tracker-api.vk-analytics.ru` → `localhost`
+            - ✅ `sdk-api.apptracer.ru` → `localhost`
+            
+            ### Патчи кода:
+            - ✅ MyTracker.initTracker() метод заменён на пустую реализацию
+            
+            ### Удалённые permissions:
+            - ❌ REQUEST_INSTALL_PACKAGES
+            - ❌ ACCESS_WIFI_STATE
+            - ❌ ACCESS_NETWORK_STATE
+            - ❌ ACCESS_FINE_LOCATION
+            - ❌ RECEIVE_BOOT_COMPLETED
+            - ❌ ACCESS_COARSE_LOCATION
+            - ❌ CHANGE_NETWORK_STATE
+            
+            ### Удалены компоненты:
+            - ❌ Все ru.ok.tracer meta-data записи
+            
+            ---
+            
+            ⚠️ **Внимание:** Это модифицированная версия приложения.
+
+            neMAX — неофициальный модифицированный клиент мессенджера "Макс"
+
+            Автор проекта не имеет никакого отношения к компании Communication Platform LLC, которая является владельцем и разработчиком оригинального приложения
+
+            neMAX создан исключительно для повышения приватности пользователей Он не является продуктом, поддерживаемым или аффилированным с Communication Platform LLC или VK
+
+            Все права на оригинальное приложение принадлежат Communication Platform LLC. Модификация распространяется в исследовательских и образовательных целях, а также для личного некоммерческого использования
+
+            Используя neMAX, вы понимаете, что это неофициальная сборка, и устанавливаете её на свой страх и риск Автор не несёт ответственности за любые последствия её применения
+            
+          files: signed.apk
+          draft: false
+          prerelease: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Cleanup
+        if: always()
+        run: |
+          rm -f keystore.jks original.apk modified.apk aligned.apk signed.apk
+          rm -f patch_mytracker.py clean_manifest.py
+          rm -rf decompiled
