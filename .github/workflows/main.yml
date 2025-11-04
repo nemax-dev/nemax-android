@@ -41,8 +41,7 @@ jobs:
 
       - name: Download APK
         run: |
-          echo "Downloading APK from: ${{ github.event.inputs.apk_url }}"
-          curl -L -o original.apk "${{ github.event.inputs.apk_url }}"
+          wget -O original.apk "${{ github.event.inputs.apk_url }}"
           
           # Проверяем, что файл скачался
           if [ ! -f original.apk ] || [ ! -s original.apk ]; then
