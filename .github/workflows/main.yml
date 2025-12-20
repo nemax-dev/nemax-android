@@ -1,271 +1,202 @@
-name: APK Modifier
+name: Auto Build neMAX
 
 on:
-  workflow_dispatch:
-    inputs:
-      apk_url:
-        description: 'APK'
-        required: true
-        type: string
-      version:
-        description: 'Версия'
-        required: true
-        type: string
+  workflow_dispatch: # Ручной запуск
+  schedule:
+    # 16:00 UTC = 19:00 MSK
+    - cron: '0 16 */2 * *'
 
 jobs:
-  modify-and-release:
+  check-and-build:
     runs-on: ubuntu-latest
-    
+    permissions:
+      contents: write
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Russian Locale
+        run: |
+          sudo locale-gen ru_RU.UTF-8
+          sudo update-locale LANG=ru_RU.UTF-8
+
+      - name: Download Target APK
+        run: |
+          wget "https://download.max.ru/android/release/google/MAX.apk" -O target.apk
+          
+      - name: Calculate Hash
+        id: calc_hash
+        run: |
+          FILE_HASH=$(sha256sum target.apk | awk '{print $1}')
+          echo "APK_HASH=$FILE_HASH" >> $GITHUB_ENV
+          echo "Hash is $FILE_HASH"
+
+      - name: Check Cache (Prevent Duplicate Builds)
+        id: check_cache
+        uses: actions/cache@v4
+        with:
+          path: target.apk
+          key: apk-processed-${{ env.APK_HASH }}
+      
+      - name: Stop if already processed
+        if: steps.check_cache.outputs.cache-hit == 'true' && github.event_name != 'workflow_dispatch'
+        run: |
+          echo "Этот APK уже был собран. Отмена."
+          exit 0
+
+      # --- НАЧАЛО СБОРКИ ---
+
       - name: Setup Java
+        if: success()
         uses: actions/setup-java@v4
         with:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Install dependencies
+      - name: Install Tools (Apktool, Apksigner, ImageMagick)
+        if: success()
         run: |
-          sudo apt-get update
-          sudo apt-get install -y wget unzip
-
-      - name: Download and setup APKTool
-        run: |
-          wget https://raw.githubusercontent.com/iBotPeaches/Apktool/master/scripts/linux/apktool
-          wget https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar
-          chmod +x apktool
-          sudo mv apktool /usr/local/bin/
-          sudo mv apktool_2.9.3.jar /usr/local/bin/apktool.jar
-
-      - name: Download APK
-        run: |
-          wget -O original.apk "${{ github.event.inputs.apk_url }}"
+          sudo apt-get update && sudo apt-get install -y zipalign imagemagick
+          wget https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar -O apktool.jar
+          chmod +x apktool.jar
           
-          # Проверяем, что файл скачался
-          if [ ! -f original.apk ] || [ ! -s original.apk ]; then
-            echo "Error: APK file was not downloaded or is empty"
-            exit 1
-          fi
-          
-          echo "APK downloaded successfully: $(ls -lh original.apk)"
+      - name: Decode Keystore
+        if: success()
+        run: |
+          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > release.keystore
 
       - name: Decompile APK
+        if: success()
         run: |
-          apktool d original.apk -o decompiled -f
+          java -jar apktool.jar d target.apk -o base_src
 
-      - name: Modify URLs in smali files
+      - name: Apply Common Mods
+        if: success()
+        working-directory: base_src
         run: |
-          echo "Replacing tracker URLs in all smali files..."
-          
-          # Замена tracker-api.vk-analytics.ru на localhost
-          find decompiled -type f -name "*.smali" -exec sed -i 's|tracker-api\.vk-analytics\.ru|localhost|g' {} +
-          
-          # Замена sdk-api.apptracer.ru на localhost
-          find decompiled -type f -name "*.smali" -exec sed -i 's|sdk-api\.apptracer\.ru|localhost|g' {} +
-          
-          echo "URLs replaced successfully"
+          # Permissions
+          sed -i '/android.permission.REQUEST_INSTALL_PACKAGES/d' AndroidManifest.xml
+          sed -i '/android.permission.ACCESS_FINE_LOCATION/d' AndroidManifest.xml
+          sed -i '/android.permission.BLUETOOTH_CONNECT/d' AndroidManifest.xml
+          sed -i '/android.permission.RECEIVE_BOOT_COMPLETED/d' AndroidManifest.xml
+          sed -i '/android.permission.ACCESS_COARSE_LOCATION/d' AndroidManifest.xml
 
-      - name: Patch MyTracker.smali
+          # Trackers
+          grep -rl "tracker-api.vk-analytics.ru" . | xargs sed -i 's/tracker-api.vk-analytics.ru/0.0.0.0/g'
+          grep -rl "sdk-api.apptracer.ru" . | xargs sed -i 's/sdk-api.apptracer.ru/0.0.0.0/g'
+
+      - name: Create Build Variants
+        if: success()
         run: |
-          echo "Patching MyTracker.smali..."
+          cp -r base_src src_orig
+          cp -r base_src src_nemax
+
+      # --- СБОРКА 1: Original Branding ---
+      
+      - name: Mod Original Branding Version
+        if: success()
+        working-directory: src_orig/res/values
+        run: |
+          sed -i 's|<string name="oneme_faq_link">https://help.max.ru</string>|<string name="oneme_faq_link">https://telegra.ph/CHto-takoe-neMAX-12-08</string>|g' strings.xml
+          sed -i 's|<string name="chat_list_toolbar_title">Чаты</string>|<string name="chat_list_toolbar_title">Чаты \| Мод от @nemax_mod</string>|g' strings.xml
+          sed -i 's|<string name="about_app_settings_version">Версия приложения</string>|<string name="about_app_settings_version">Версия MAX. Мод от @nemax_mod</string>|g' strings.xml
+
+      - name: Build & Sign Original Branding
+        if: success()
+        run: |
+          java -jar apktool.jar b src_orig -o uns_orig.apk
+          zipalign -p -f -v 4 uns_orig.apk aligned_orig.apk
+          $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks release.keystore --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} --key-pass pass:${{ secrets.KEY_PASSWORD }} --ks-key-alias ${{ secrets.KEY_ALIAS }} --out neMAX-Original-Branding.apk aligned_orig.apk
+
+      # --- СБОРКА 2: neMAX Full ---
+
+      - name: Mod neMAX Full Version
+        if: success()
+        run: |
+          # 1. Строки
+          sed -i 's|<string name="oneme_app_name">MAX</string>|<string name="oneme_app_name">neMAX</string>|g' src_nemax/res/values/strings.xml
+          sed -i 's|<string name="oneme_faq_link">https://help.max.ru</string>|<string name="oneme_faq_link">https://telegra.ph/CHto-takoe-neMAX-12-08</string>|g' src_nemax/res/values/strings.xml
+          sed -i 's|<string name="chat_list_toolbar_title">Чаты</string>|<string name="chat_list_toolbar_title">Чаты \| Мод от @nemax_mod</string>|g' src_nemax/res/values/strings.xml
+          sed -i 's|<string name="about_app_settings_version">Версия приложения</string>|<string name="about_app_settings_version">Версия MAX. Мод от @nemax_mod</string>|g' src_nemax/res/values/strings.xml
+
+          # 2. АВТО-НАРЕЗКА ИКОНОК (Magic!)
+          echo "Resizing icons..."
+          # Твой исходник
+          SOURCE_ICON="ic_launcher_background.webp"
           
-          # Находим файл MyTracker.smali
-          MYTRACKER_FILE=$(find decompiled -type f -name "MyTracker.smali" | head -1)
-          
-          if [ -z "$MYTRACKER_FILE" ]; then
-            echo "Warning: MyTracker.smali not found, skipping patch"
-          else
-            echo "Found MyTracker.smali at: $MYTRACKER_FILE"
-            
-            # Создаем Python скрипт для замены метода
-            cat > patch_mytracker.py << 'EOF'
-          import sys
-          import re
-          
-          file_path = sys.argv[1]
-          
-          with open(file_path, 'r', encoding='utf-8') as f:
-              content = f.read()
-          
-          # Паттерн для поиска метода initTracker
-          pattern = r'\.method public static initTracker\(Ljava/lang/String;Landroid/app/Application;\)V.*?\.end method'
-          
-          # Новая реализация метода
-          replacement = '''.method public static initTracker(Ljava/lang/String;Landroid/app/Application;)V
-              .locals 0
-              return-void
-          .end method'''
-          
-          # Заменяем метод
-          new_content = re.sub(pattern, replacement, content, flags=re.DOTALL)
-          
-          with open(file_path, 'w', encoding='utf-8') as f:
-              f.write(new_content)
-          
-          print("MyTracker.smali patched successfully")
+          # Функция ресайза: папка размер
+          resize_icon() {
+            local folder=$1
+            local size=$2
+            echo "Generating $size x $size for $folder"
+            # -resize ...! означает принудительный размер, даже если пропорции поедут (лучше используй квадратный исходник)
+            convert "$SOURCE_ICON" -resize "${size}x${size}!" "src_nemax/res/$folder/ic_launcher_background.webp"
+          }
+
+          resize_icon "mipmap-mdpi"    "108"
+          resize_icon "mipmap-hdpi"    "162"
+          resize_icon "mipmap-xhdpi"   "216"
+          resize_icon "mipmap-xxhdpi"  "324"
+          resize_icon "mipmap-xxxhdpi" "432"
+
+          # 3. Вектор Foreground
+          cat <<EOF > src_nemax/res/drawable/ic_launcher_foreground.xml
+          <?xml version="1.0" encoding="utf-8"?>
+          <vector android:height="108.0dip" android:width="108.0dip" android:viewportWidth="373.0" android:viewportHeight="371.0"
+            xmlns:android="http://schemas.android.com/apk/res/android">
+              <group android:scaleX="0.47055554" android:scaleY="0.46803248" android:translateX="98.74139" android:translateY="98.67998">
+                  <path android:fillColor="#ffffffff" android:pathData="M190.06,369.48C153.52,369.48 136.55,364.13 107.11,342.72C88.38,366.8 29.43,385.53 26.84,353.42C26.84,329.37 21.44,309.1 15.49,286.78C8.2,259.45 0.09,229.04 0.09,184.85C0.09,79.48 86.56,0.23 189.09,0.23C291.62,0.23 372.01,83.35 372.01,185.88C372.01,288.41 289.06,369.48 190.06,369.48ZM191.55,91.33C141.66,88.71 102.72,123.31 94.14,177.47C87.03,222.31 99.63,276.96 110.41,279.71C115.5,281.01 128.52,270.48 136.54,262.45C149.75,271.01 164.9,277.63 181.74,278.52C232.96,281.2 278.36,241.14 281.04,189.94C283.72,138.75 242.77,94.01 191.55,91.33Z" android:fillType="evenOdd" />
+              </group>
+          </vector>
           EOF
-            
-            python3 patch_mytracker.py "$MYTRACKER_FILE"
-          fi
 
-      - name: Clean AndroidManifest.xml
+      - name: Build & Sign neMAX Full
+        if: success()
         run: |
-          echo "Cleaning AndroidManifest.xml..."
-          
-          MANIFEST_FILE="decompiled/AndroidManifest.xml"
-          
-          if [ ! -f "$MANIFEST_FILE" ]; then
-            echo "Error: AndroidManifest.xml not found"
-            exit 1
-          fi
-          
-          # Создаем Python скрипт для очистки манифеста
-          cat > clean_manifest.py << 'EOF'
-          import re
-          
-          with open('decompiled/AndroidManifest.xml', 'r', encoding='utf-8') as f:
-              content = f.read()
-          
-          # Удаляем permissions
-          permissions_to_remove = [
-              'android.permission.REQUEST_INSTALL_PACKAGES',
-              'android.permission.ACCESS_WIFI_STATE',
-              'android.permission.ACCESS_NETWORK_STATE',
-              'android.permission.ACCESS_FINE_LOCATION',
-              'android.permission.RECEIVE_BOOT_COMPLETED',
-              'android.permission.ACCESS_COARSE_LOCATION',
-              'android.permission.CHANGE_NETWORK_STATE'
-          ]
-          
-          for perm in permissions_to_remove:
-              pattern = rf'<uses-permission[^>]*android:name="{re.escape(perm)}"[^/]*/>\s*'
-              content = re.sub(pattern, '', content)
-          
-          # Удаляем meta-data с ru.ok.tracer
-          meta_data_pattern = r'<meta-data\s+android:name="ru\.ok\.tracer[^"]*"[^>]*android:value="[^"]*"\s*/>\s*'
-          content = re.sub(meta_data_pattern, '', content, flags=re.MULTILINE)
-          
-          with open('decompiled/AndroidManifest.xml', 'w', encoding='utf-8') as f:
-              f.write(content)
-          
-          print("AndroidManifest.xml cleaned successfully")
-          EOF
-          
-          python3 clean_manifest.py
+          java -jar apktool.jar b src_nemax -o uns_nemax.apk
+          zipalign -p -f -v 4 uns_nemax.apk aligned_nemax.apk
+          $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks release.keystore --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} --key-pass pass:${{ secrets.KEY_PASSWORD }} --ks-key-alias ${{ secrets.KEY_ALIAS }} --out neMAX-Full.apk aligned_nemax.apk
 
-      - name: Rebuild APK
-        run: |
-          apktool b decompiled -o modified.apk
+      # --- ПУБЛИКАЦИЯ ---
 
-      - name: Sign APK
+      - name: Generate Release Info
+        if: success()
+        id: release_info
         run: |
-          # Создание keystore из секрета
-          echo "${{ secrets.KEYSTORE_BASE64 }}" | base64 -d > keystore.jks
-          
-          # Выравнивание APK
-          $ANDROID_HOME/build-tools/34.0.0/zipalign -v -p 4 modified.apk aligned.apk
-          
-          # Подпись APK
-          $ANDROID_HOME/build-tools/34.0.0/apksigner sign \
-            --ks keystore.jks \
-            --ks-key-alias "${{ secrets.KEY_ALIAS }}" \
-            --ks-pass pass:"${{ secrets.KEYSTORE_PASSWORD }}" \
-            --key-pass pass:"${{ secrets.KEY_PASSWORD }}" \
-            --out signed.apk \
-            aligned.apk
-          
-          # Проверка подписи
-          $ANDROID_HOME/build-tools/34.0.0/apksigner verify signed.apk
-          
-          echo "APK signed successfully"
-
-      - name: Calculate version
-        id: version
-        run: |
-          INPUT_VERSION="${{ github.event.inputs.version }}"
-          NEW_VERSION="${INPUT_VERSION}+auto"
-          echo "new_version=$NEW_VERSION" >> $GITHUB_OUTPUT
-          echo "New version will be: $NEW_VERSION"
+          export LC_TIME=ru_RU.UTF-8
+          DATE_STR=$(date "+%d %B %Y года")
+          echo "RELEASE_DATE=$DATE_STR" >> $GITHUB_ENV
 
       - name: Create Release
-        id: create_release
+        if: success()
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: v${{ steps.version.outputs.new_version }}
-          name: Release v${{ steps.version.outputs.new_version }}
+          tag_name: v${{ env.APK_HASH }}
+          name: Обновление до базы MAX от ${{ env.RELEASE_DATE }}
+          files: |
+            neMAX-Original-Branding.apk
+            neMAX-Full.apk
           body: |
-            🤖 Автоматически модифицированная версия APK
-            
-            **Базовая версия:** ${{ github.event.inputs.version }}
-            **Модифицированная версия:** ${{ steps.version.outputs.new_version }}
-            
-            ## Изменения:
-            
-            ### URL замены:
-            - ✅ `tracker-api.vk-analytics.ru` → `localhost`
-            - ✅ `sdk-api.apptracer.ru` → `localhost`
-            
-            ### Патчи кода:
-            - ✅ MyTracker.initTracker() метод заменён на пустую реализацию
-            
-            ### Удалённые permissions:
-            - ❌ REQUEST_INSTALL_PACKAGES
-            - ❌ ACCESS_WIFI_STATE
-            - ❌ ACCESS_NETWORK_STATE
-            - ❌ ACCESS_FINE_LOCATION
-            - ❌ RECEIVE_BOOT_COMPLETED
-            - ❌ ACCESS_COARSE_LOCATION
-            - ❌ CHANGE_NETWORK_STATE
-            
-            ### Удалены компоненты:
-            - ❌ Все ru.ok.tracer meta-data записи
+            ### 🤖 Автоматический релиз neMAX
+            Базовая версия приложения обновлена до актуальной версии MAX от ${{ env.RELEASE_DATE }}.
+            **Hash базы (SHA256):** `${{ env.APK_HASH }}`
             
             ---
             
-            ⚠️ **Внимание:** Это модифицированная версия приложения.
-
-            neMAX — неофициальный модифицированный клиент мессенджера "Макс"
-
-            Автор проекта не имеет никакого отношения к компании Communication Platform LLC, которая является владельцем и разработчиком оригинального приложения
-
-            neMAX создан исключительно для повышения приватности пользователей Он не является продуктом, поддерживаемым или аффилированным с Communication Platform LLC или VK
-
-            Все права на оригинальное приложение принадлежат Communication Platform LLC. Модификация распространяется в исследовательских и образовательных целях, а также для личного некоммерческого использования
-
-            Используя neMAX, вы понимаете, что это неофициальная сборка, и устанавливаете её на свой страх и риск Автор не несёт ответственности за любые последствия её применения
+            ### ⚠️ Инструкция по установке
+            1. Перед установкой **neMAX** настоятельно рекомендуется удалить оригинальное приложение MAX.
+            2. Обновление поверх старой версии neMAX может пройти успешно, но если возникают ошибки — удалите старую версию и установите новую начисто.
             
-          files: signed.apk
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Send Telegram Notification on Success
-        if: success()
-        env:
-          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
-          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          RELEASE_VERSION: v${{ steps.version.outputs.new_version }}
-          RELEASE_URL: ${{ steps.create_release.outputs.html_url }}
-        run: |
-          MESSAGE_TEXT="✅ <b>Автоматический релиз neMAX</b>%0A%0A<b>Версия:</b> ${RELEASE_VERSION}%0A%0AЭто упрощённое автоматическое техническое обновление в связи с выходом новой версии оригинального приложения. Полноценный релиз с полным списком изменений ожидается позднее.%0A%0A<a href=\"${RELEASE_URL}\">Скачать с GitHub</a>"
-          
-          DISCLAIMER_TEXT="<pre>neMAX — неофициальный модифицированный клиент мессенджера \"Макс\"%0A%0AАвтор проекта не имеет никакого отношения к компании Communication Platform LLC, которая является владельцем и разработчиком оригинального приложения%0A%0AneMAX создан исключительно для повышения приватности пользователей Он не является продуктом, поддерживаемым или аффилированным с Communication Platform LLC или VK%0A%0AВсе права на оригинальное приложение принадлежат Communication Platform LLC. Модификация распространяется в исследовательских и образовательных целях, а также для личного некоммерческого использования%0A%0AИспользуя neMAX, вы понимаете, что это неофициальная сборка, и устанавливаете её на свой страх и риск Автор не несёт ответственности за любые последствия её применения</pre>"
-          
-          FINAL_MESSAGE="${MESSAGE_TEXT}%0A%0A${DISCLAIMER_TEXT}"
-
-          echo "Sending notification to Telegram..."
-          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
-            -d chat_id="${TELEGRAM_CHAT_ID}" \
-            -d text="${FINAL_MESSAGE}" \
-            -d parse_mode="HTML" \
-            -d disable_web_page_preview="true"
-
-      - name: Cleanup
-        if: always()
-        run: |
-          rm -f keystore.jks original.apk modified.apk aligned.apk signed.apk
-          rm -f patch_mytracker.py clean_manifest.py
-          rm -rf decompiled
+            ### 📋 Что изменено (Changelog)
+            Это автоматическая версия, никаких дополнительных улучшений (improvements), кроме базового мода:
+            *   ✅ Удалены трекеры и аналитика (заглушены на 0.0.0.0).
+            *   ✅ Вырезаны лишние Permissions (доступ к местоположению, установке пакетов и др.).
+            *   ✅ В полной версии изменены иконки и название.
+            
+            ### ⚖️ EULA и Отказ от ответственности
+            > Скачивая, дыша, смотря или делая хоть что-то с APK neMAX, ты соглашаешься с [EULA](https://telegra.ph/LICENZIONNOE-SOGLASHENIE-KONECHNOGO-POLZOVATELYA-EULA-12-10).
+            
+            *Все заявления автора и описание мода стоит рассматривать только через призму EULA и здравого смысла.*
+            
+            *Данная сборка сформирована автоматически GitHub Actions.*
