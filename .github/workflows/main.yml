@@ -1,9 +1,8 @@
 name: Auto Build neMAX
 
 on:
-  workflow_dispatch: # Ручной запуск
+  workflow_dispatch:
   schedule:
-    # 16:00 UTC = 19:00 MSK
     - cron: '0 16 */2 * *'
 
 jobs:
@@ -45,7 +44,6 @@ jobs:
           echo "Этот APK уже был собран. Отмена."
           exit 0
 
-      # --- НАЧАЛО СБОРКИ ---
 
       - name: Setup Java
         if: success()
@@ -54,11 +52,10 @@ jobs:
           distribution: 'temurin'
           java-version: '17'
 
-      - name: Install Tools (Apktool, Apksigner, ImageMagick)
+      - name: Install Tools (Zipalign, ImageMagick)
         if: success()
         run: |
           sudo apt-get update && sudo apt-get install -y zipalign imagemagick
-          wget https://bitbucket.org/iBotPeaches/apktool/downloads/apktool_2.9.3.jar -O apktool.jar
           chmod +x apktool.jar
           
       - name: Decode Keystore
@@ -92,7 +89,6 @@ jobs:
           cp -r base_src src_orig
           cp -r base_src src_nemax
 
-      # --- СБОРКА 1: Original Branding ---
       
       - name: Mod Original Branding Version
         if: success()
@@ -109,28 +105,21 @@ jobs:
           zipalign -p -f -v 4 uns_orig.apk aligned_orig.apk
           $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks release.keystore --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} --key-pass pass:${{ secrets.KEY_PASSWORD }} --ks-key-alias ${{ secrets.KEY_ALIAS }} --out neMAX-Original-Branding.apk aligned_orig.apk
 
-      # --- СБОРКА 2: neMAX Full ---
 
       - name: Mod neMAX Full Version
         if: success()
         run: |
-          # 1. Строки
           sed -i 's|<string name="oneme_app_name">MAX</string>|<string name="oneme_app_name">neMAX</string>|g' src_nemax/res/values/strings.xml
           sed -i 's|<string name="oneme_faq_link">https://help.max.ru</string>|<string name="oneme_faq_link">https://telegra.ph/CHto-takoe-neMAX-12-08</string>|g' src_nemax/res/values/strings.xml
           sed -i 's|<string name="chat_list_toolbar_title">Чаты</string>|<string name="chat_list_toolbar_title">Чаты \| Мод от @nemax_mod</string>|g' src_nemax/res/values/strings.xml
           sed -i 's|<string name="about_app_settings_version">Версия приложения</string>|<string name="about_app_settings_version">Версия MAX. Мод от @nemax_mod</string>|g' src_nemax/res/values/strings.xml
 
-          # 2. АВТО-НАРЕЗКА ИКОНОК (Magic!)
           echo "Resizing icons..."
-          # Твой исходник
           SOURCE_ICON="ic_launcher_background.webp"
           
-          # Функция ресайза: папка размер
           resize_icon() {
             local folder=$1
             local size=$2
-            echo "Generating $size x $size for $folder"
-            # -resize ...! означает принудительный размер, даже если пропорции поедут (лучше используй квадратный исходник)
             convert "$SOURCE_ICON" -resize "${size}x${size}!" "src_nemax/res/$folder/ic_launcher_background.webp"
           }
 
@@ -140,7 +129,6 @@ jobs:
           resize_icon "mipmap-xxhdpi"  "324"
           resize_icon "mipmap-xxxhdpi" "432"
 
-          # 3. Вектор Foreground
           cat <<EOF > src_nemax/res/drawable/ic_launcher_foreground.xml
           <?xml version="1.0" encoding="utf-8"?>
           <vector android:height="108.0dip" android:width="108.0dip" android:viewportWidth="373.0" android:viewportHeight="371.0"
@@ -158,7 +146,6 @@ jobs:
           zipalign -p -f -v 4 uns_nemax.apk aligned_nemax.apk
           $ANDROID_HOME/build-tools/34.0.0/apksigner sign --ks release.keystore --ks-pass pass:${{ secrets.KEYSTORE_PASSWORD }} --key-pass pass:${{ secrets.KEY_PASSWORD }} --ks-key-alias ${{ secrets.KEY_ALIAS }} --out neMAX-Full.apk aligned_nemax.apk
 
-      # --- ПУБЛИКАЦИЯ ---
 
       - name: Generate Release Info
         if: success()
@@ -173,30 +160,30 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: v${{ env.APK_HASH }}
-          name: Обновление до базы MAX от ${{ env.RELEASE_DATE }}
+          name: Обновление до базы MAX на момент ${{ env.RELEASE_DATE }}
           files: |
             neMAX-Original-Branding.apk
             neMAX-Full.apk
           body: |
             ### 🤖 Автоматический релиз neMAX
-            Базовая версия приложения обновлена до актуальной версии MAX от ${{ env.RELEASE_DATE }}.
+            Базовая версия приложения обновлена до актуальной версии MAX на момент ${{ env.RELEASE_DATE }}.
             **Hash базы (SHA256):** `${{ env.APK_HASH }}`
             
             ---
             
-            ### ⚠️ Инструкция по установке
+            ### Инструкция по установке
             1. Перед установкой **neMAX** настоятельно рекомендуется удалить оригинальное приложение MAX.
             2. Обновление поверх старой версии neMAX может пройти успешно, но если возникают ошибки — удалите старую версию и установите новую начисто.
             
-            ### 📋 Что изменено (Changelog)
+            ### Что изменено (Changelog)
             Это автоматическая версия, никаких дополнительных улучшений (improvements), кроме базового мода:
-            *   ✅ Удалены трекеры и аналитика (заглушены на 0.0.0.0).
-            *   ✅ Вырезаны лишние Permissions (доступ к местоположению, установке пакетов и др.).
-            *   ✅ В полной версии изменены иконки и название.
+            *   Удалены трекеры и аналитика (заглушены на 0.0.0.0).
+            *   Вырезаны лишние Permissions (доступ к местоположению, установке пакетов и др.).
+            *   В полной версии изменены иконки и название.
             
-            ### ⚖️ EULA и Отказ от ответственности
-            > Скачивая, дыша, смотря или делая хоть что-то с APK neMAX, ты соглашаешься с [EULA](https://telegra.ph/LICENZIONNOE-SOGLASHENIE-KONECHNOGO-POLZOVATELYA-EULA-12-10).
+            ### ⚖️ ToS и Отказ от ответственности
+            > Скачивая, дыша, смотря или делая хоть что-то с APK neMAX, ты соглашаешься с [ToS проекта neMAX](https://tos.nemax-mod.ru).
             
-            *Все заявления автора и описание мода стоит рассматривать только через призму EULA и здравого смысла.*
+            *Все заявления автора и описание мода стоит рассматривать только через призму ToS проекта neMAX и здравого смысла.*
             
             *Данная сборка сформирована автоматически GitHub Actions.*
