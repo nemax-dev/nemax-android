@@ -20,9 +20,31 @@ jobs:
           sudo locale-gen ru_RU.UTF-8
           sudo update-locale LANG=ru_RU.UTF-8
 
-      - name: Download Target APK
+      - name: Download Target APK from RuStore
         run: |
-          wget "https://download.max.ru/android/release/google/MAX.apk" -O target.apk
+          RESPONSE=$(curl -s -X POST "https://backapi.rustore.ru/applicationData/v2/download-link" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "appId": 2063618637,
+              "firstInstall": true,
+              "mobileServices": [],
+              "screenDensity": 0,
+              "sdkVersion": 26,
+              "signatureFingerprint": null,
+              "supportedAbis": ["x86_64", "arm64-v8a", "x86", "armeabi-v7a", "armeabi"],
+              "supportedLocales": ["ru_RU"],
+              "withoutSplits": true
+            }')
+          
+          DOWNLOAD_URL=$(echo "$RESPONSE" | jq -r '.body.downloadUrls[0].url')
+          
+          if [ "$DOWNLOAD_URL" == "null" ] || [ -z "$DOWNLOAD_URL" ]; then
+            echo "Ошибка: Не удалось получить ссылку. Ответ API: $RESPONSE"
+            exit 1
+          fi
+          
+          echo "Ссылка получена, скачиваю..."
+          curl -L "$DOWNLOAD_URL" -o target.apk
           
       - name: Calculate Hash
         id: calc_hash
