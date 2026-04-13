@@ -3,7 +3,7 @@ name: Auto Build neMAX
 on:
   workflow_dispatch:
   schedule:
-    - cron: '0 16 */2 * *'
+    - cron: '0 16 */14 * *'
 
 jobs:
   check-and-build:
